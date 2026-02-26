@@ -22,11 +22,7 @@
 #define SERVO_1_PIN    18       // Pin for Servo 1
 #define SERVO_2_PIN    19       // Pin for Servo 2
 #define SERVO_3_PIN    21       // Pin for Servo 3
-#define SERVO_4_PIN    22       // Pin for Servo 4
 
 // --- Sensor Pins ---
-#define ledPin         2
-#define TRIG_PIN       5        // Ultrasonic sensor trigger pin
-#define ECHO_PIN       17       // Ultrasonic sensor echo pin
 
 #endif

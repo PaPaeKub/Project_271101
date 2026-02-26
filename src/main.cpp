@@ -8,9 +8,13 @@
 void handleRoot();
 void handleLEDOn();
 void handleLEDOff();
-void moveForward(int speed);
+void forward();
+void backward();
+void turnleft();
+void turnright();
 void stopRobot();
 void connectWiFi();
+void sttering(int x,int omega);
 
 // --- 1. Create Motor Objects ---
 // Parameters: (Mode, Frequency, Bits, Invert, Brake, PWM_Pin, IN1, IN2)
@@ -19,9 +23,10 @@ Controller motorR(Controller::PRIK_NO_ENA, PWM_FREQUENCY, PWM_BITS, MOT_R_INV, t
 
 WebServer server(80);
 
+int speed,r;
+
 void setup() {
     Serial.begin(115200);
-    pinMode(ledPin, OUTPUT); // Ensure ledPin is in your config
     
     connectWiFi(); //
 
@@ -36,6 +41,7 @@ void setup() {
 
 void loop() {
     server.handleClient();
+    sttering(speed , r);
 }
 
 void connectWiFi() {
@@ -87,12 +93,28 @@ void handleRoot() {
     
     server.send(200, "text/html", s); //
 }
-void handleLEDOn() {
-    digitalWrite(ledPin, HIGH);
+void foraward() {
+    speed = 511;
     server.send(200, "text/plain", "OK"); // ส่งแค่คำว่า OK กลับไป
 }
 
-void handleLEDOff() {
-    digitalWrite(ledPin, LOW);
+void backward() {
+    speed = -511;
     server.send(200, "text/plain", "OK");
+}
+
+void turnleft(){
+  r = -511;
+  server.send(200, "text/plain", "OK");
+}
+
+void turnright(){
+  r = 511;
+  server.send(200, "text/plain", "OK");
+}
+
+
+void sttering(int x, int omega){
+  motorL.spin(speed + omega);
+  motorR.spin(speed - omega);
 }
