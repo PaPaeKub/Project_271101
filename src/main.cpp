@@ -14,7 +14,7 @@ void turnleft();
 void turnright();
 void stopRobot();
 void connectWiFi();
-void sttering(int x,int omega);
+void steering(int x,int omega);
 
 // --- 1. Create Motor Objects ---
 // Parameters: (Mode, Frequency, Bits, Invert, Brake, PWM_Pin, IN1, IN2)
@@ -31,17 +31,17 @@ void setup() {
     connectWiFi(); //
 
     // Setup Web Routes
-    server.on("/", handleRoot);
-    server.on("/on", handleLEDOn);
-    server.on("/off", handleLEDOff);
-    server.begin();
+    //server.on("/", handleRoot);
+    //server.on("/on", handleLEDOn);
+    //server.on("/off", handleLEDOff);
+    //server.begin();
     
     Serial.println("HTTP server started");
 }
 
 void loop() {
     server.handleClient();
-    sttering(speed , r);
+    steering(speed , r);
 }
 
 void connectWiFi() {
@@ -114,7 +114,7 @@ void turnright(){
 }
 
 
-void sttering(int x, int omega){
+void steering(int x, int omega){
   motorL.spin(speed + omega);
   motorR.spin(speed - omega);
 }
