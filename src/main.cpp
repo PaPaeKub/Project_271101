@@ -139,5 +139,6 @@ void stopRobot() {
 // --- 6. Motor Control Function ---
 void steering(int x, int omega) {
     motorL.spin(x + omega);
+    
     motorR.spin(x - omega);
 }
