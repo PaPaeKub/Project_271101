@@ -16,8 +16,8 @@ void steering(int x, int omega);
 
 // --- 2. Create Motor Objects ---
 // Parameters: (Mode, Frequency, Bits, Invert, Brake, PWM_Pin, IN1, IN2)
-Controller motorL(Controller::PRIK_NO_ENA, PWM_FREQUENCY, PWM_BITS, MOT_L_INV, true, MOT_L_PWM, MOT_L_IN1, MOT_L_IN2);
-Controller motorR(Controller::PRIK_NO_ENA, PWM_FREQUENCY, PWM_BITS, MOT_R_INV, true, MOT_R_PWM, MOT_R_IN1, MOT_R_IN2);
+Controller motorL(Controller::PRIK_NO_ENA, PWM_FREQUENCY, PWM_BITS, AINV, true, PWMA, AIN1, AIN2);
+Controller motorR(Controller::PRIK_NO_ENA, PWM_FREQUENCY, PWM_BITS, BINV, true, PWMB, BIN1, BIN2);
 
 WebServer server(80);
 
@@ -47,10 +47,7 @@ void setup() {
 void loop() {
     server.handleClient();      // รอรับคำสั่งจากหน้าเว็บตลอดเวลา
     steering(speed, r);         // อัปเดตความเร็วมอเตอร์ตลอดเวลาตามค่า speed และ r
-    Serial.println("\n Speed :"); 
-    Serial.println(speed); 
-    Serial.println("\n Rotaion :"); 
-    Serial.println(r); 
+
 }
 
 void connectWiFi() {
