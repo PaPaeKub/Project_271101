@@ -1,144 +1,80 @@
 #include <Arduino.h>
 #include <motor.h>    // Use < > because it is in the /lib folder
 #include <config.h>   // Use " " because it is in the /include folder
-#include <WiFi.h>
-#include <WebServer.h>
 
-// --- 1. Function Prototypes ---
-void handleRoot();
-void forward();
-void backward();
-void turnleft();
-void turnright();
-void stopRobot();
-void connectWiFi();
+// --- เรียกใช้ไลบรารี Dabble สำหรับ Bluetooth ---
+#define CUSTOM_SETTINGS
+#define INCLUDE_GAMEPAD_MODULE
+#include <DabbleESP32.h>
+
+#define STBY 32
+
+// --- Function Prototypes ---
 void steering(int x, int omega);
 
-// --- 2. Create Motor Objects ---
+// --- Create Motor Objects ---
 // Parameters: (Mode, Frequency, Bits, Invert, Brake, PWM_Pin, IN1, IN2)
 Controller motorL(Controller::PRIK_NO_ENA, PWM_FREQUENCY, PWM_BITS, AINV, true, PWMA, AIN1, AIN2);
 Controller motorR(Controller::PRIK_NO_ENA, PWM_FREQUENCY, PWM_BITS, BINV, true, PWMB, BIN1, BIN2);
 
-WebServer server(80);
-
-// กำหนดค่าเริ่มต้นให้เป็น 0 เพื่อความปลอดภัยตอนเปิดเครื่อง
 int speed = 0; 
 int r = 0;
 
 void setup() {
     Serial.begin(115200);
     
-    connectWiFi();
-
-    // --- 3. Setup Web Routes ---
-    // กำหนดเส้นทางว่าถ้าเว็บส่งคำสั่งอะไรมา ให้ไปเรียกฟังก์ชันไหนทำงาน
-    server.on("/", handleRoot);
-    server.on("/forward", forward);
-    server.on("/backward", backward);
-    server.on("/left", turnleft);
-    server.on("/right", turnright);
-    server.on("/stop", stopRobot);
+    // เปิดใช้งาน Standby Pin ของ Driver มอเตอร์
+    pinMode(STBY, OUTPUT);
+    digitalWrite(STBY, HIGH);
     
-    server.begin();
+    // ตั้งชื่อ Bluetooth ที่จะไปโผล่ในแอป (สามารถแก้ชื่อตรงนี้ได้เลย)
+    Dabble.begin("MyRobot_ESP32"); 
     
-    Serial.println("HTTP server started");
+    Serial.println("Bluetooth Started! Waiting for Dabble app to connect...");
 }
 
 void loop() {
-    server.handleClient();      // รอรับคำสั่งจากหน้าเว็บตลอดเวลา
-    steering(speed, r);         // อัปเดตความเร็วมอเตอร์ตลอดเวลาตามค่า speed และ r
+    // 1. อัปเดตข้อมูลจาก Bluetooth ตลอดเวลา (ขาดบรรทัดนี้แอปจะค้าง/คุมไม่ได้)
+    Dabble.processInput(); 
 
-}
-
-void connectWiFi() {
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    Serial.print("Connecting to WiFi");
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
+    // 2. ตรวจสอบการกดปุ่มบน Gamepad ของ Dabble
+    if (GamePad.isUpPressed()) {
+        speed = 511; // เดินหน้าเต็มกำลัง
+        r = 0;
+    } 
+    else if (GamePad.isDownPressed()) {
+        speed = -511; // ถอยหลังเต็มกำลัง
+        r = 0;
+    } 
+    else if (GamePad.isLeftPressed()) {
+        speed = 0;
+        r = -511; // หมุนอยู่กับที่ไปทางซ้าย
+    } 
+    else if (GamePad.isRightPressed()) {
+        speed = 0;
+        r = 511;  // หมุนอยู่กับที่ไปทางขวา
+    } 
+    else {
+        // ถ้าปล่อยปุ่มทั้งหมด ให้หุ่นหยุด
+        speed = 0;
+        r = 0;
     }
-    Serial.println("\nConnected!");
-    Serial.print("IP Address: ");
-    Serial.println(WiFi.localIP()); 
-    //Serial.println("\n Speed :"); 
-    //Serial.println(speed); 
-    //Serial.println("\n Rotaion :"); 
-    //Serial.println(r); 
+
+    // 3. ส่งค่าไปคำนวณให้ล้อซ้าย-ขวาหมุน
+    steering(speed, r);
 }
 
-// --- 4. Web Page HTML & UI ---
-void handleRoot() {
-    String s = "<html><head>";
-    // บังคับสเกลหน้าเว็บไม่ให้ขยายแต่แรก
-    s += "<meta name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no'>";
-    
-    s += "<script>";
-    s += "function sendCmd(cmd) { fetch('/' + cmd); }";
-    s += "document.addEventListener('contextmenu', event => event.preventDefault());";
-    s += "</script>";
-
-    s += "<style>";
-    // ล็อกหน้าจอไม่ให้เลื่อนขยับได้
-    s += "body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #222; overflow: hidden; overscroll-behavior: none; }";
-    s += ".dpad { display: grid; grid-template-columns: repeat(3, 80px); grid-template-rows: repeat(3, 80px); gap: 10px; }";
-    
-    // ตรง touch-action: manipulation; และ touch-action: none; คือตัวป้องกันการซูมเมื่อกดย้ำๆ ครับ
-    s += ".btn { background-color: #444; color: white; border: none; border-radius: 15px; font-size: 24px; font-weight: bold; cursor: pointer; user-select: none; -webkit-touch-callout: none; touch-action: none; }";
-    
-    s += ".btn:active { background-color: #00cc66; transform: scale(0.95); }";
-    s += ".up { grid-column: 2; grid-row: 1; }";
-    s += ".left { grid-column: 1; grid-row: 2; }";
-    s += ".right { grid-column: 3; grid-row: 2; }";
-    s += ".down { grid-column: 2; grid-row: 3; }";
-    s += "</style>";
-    s += "</head><body>";
-
-    s += "<div class='dpad'>";
-    s += "<button class='btn up' onmousedown=\"sendCmd('forward')\" onmouseup=\"sendCmd('stop')\" ontouchstart=\"sendCmd('forward')\" ontouchend=\"sendCmd('stop')\">W</button>";
-    s += "<button class='btn left' onmousedown=\"sendCmd('left')\" onmouseup=\"sendCmd('stop')\" ontouchstart=\"sendCmd('left')\" ontouchend=\"sendCmd('stop')\">A</button>";
-    s += "<button class='btn right' onmousedown=\"sendCmd('right')\" onmouseup=\"sendCmd('stop')\" ontouchstart=\"sendCmd('right')\" ontouchend=\"sendCmd('stop')\">D</button>";
-    s += "<button class='btn down' onmousedown=\"sendCmd('backward')\" onmouseup=\"sendCmd('stop')\" ontouchstart=\"sendCmd('backward')\" ontouchend=\"sendCmd('stop')\">S</button>";
-    s += "</div>";
-
-    s += "</body></html>";
-    
-    server.send(200, "text/html", s);
-}
-
-// --- 5. Movement Functions ---
-void forward() {
-    speed = 511;
-    r = 0;
-    server.send(200, "text/plain", "OK");
-}
-
-void backward() {
-    speed = -511;
-    r = 0;
-    server.send(200, "text/plain", "OK");
-}
-
-void turnleft() {
-    speed = 0;
-    r = -511;
-    server.send(200, "text/plain", "OK");
-}
-
-void turnright() {
-    speed = 0;
-    r = 511;
-    server.send(200, "text/plain", "OK");
-}
-
-void stopRobot() {
-    speed = 0;
-    r = 0;
-    server.send(200, "text/plain", "OK");
-}
-
-// --- 6. Motor Control Function ---
+// --- Motor Control Function ---
 void steering(int x, int omega) {
-    motorL.spin(x + omega);
-    
-    motorR.spin(x - omega);
-}
+    // คำนวณความเร็วแต่ละล้อแบบ Differential Drive
+    int pwmLeft = x + omega;
+    int pwmRight = x - omega;
+
+    // ล็อกเพดานความเร็ว ป้องกันค่าทะลุ Limit ของ PWM (511 หรือ -511)
+    pwmLeft = constrain(pwmLeft, -511, 511);
+    pwmRight = constrain(pwmRight, -511, 511);
+
+    // สั่งมอเตอร์หมุน
+    motorL.spin(pwmLeft);
+    motorR.spin(pwmRight);
+}   
