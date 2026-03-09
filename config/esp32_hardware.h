@@ -1,6 +1,9 @@
 #ifndef ESP32_HARDWARE_H
 #define ESP32_HARDWARE_H
 
+#define PWM_Max 1023
+#define PWM_Min PWM_Max * -1
+
 // --- Motor Settings ---
 #define PWM_FREQUENCY  20000    // Speed of the motor signal (20kHz is quiet)
 #define PWM_BITS       10       // How many bits for speed (10 bits = 0 to 1023)
@@ -19,9 +22,7 @@
 #define BINV      true     // Set to 'true' to change direction
 
 // --- Servo Pins ---
-// #define SERVO_1_PIN    18       // Pin for Servo 1
-// #define SERVO_2_PIN    19       // Pin for Servo 2
-// #define SERVO_3_PIN    21       // Pin for Servo 3
+#define INTAKE_PIN 17      // Pin for Intake Servo (MG996R 360 degree)
 
 // --- Sensor Pins ---
 
