@@ -1,8 +1,8 @@
 #include <Arduino.h>
-#include <motor.h>      // Include custom motor library (from /lib folder)
-#include <config.h>     // Include hardware pin configurations and settings
-#include <ESP32Servo.h> // Include ESP32 Servo library
-#include <PIDF.h>       // Include custom PIDF control library
+#include <motor.h>      
+#include <config.h>     
+#include <ESP32Servo.h> 
+#include <PIDF.h>       
 #include <PIDF_config.h>
 
 // --- Include Dabble library for Bluetooth gamepad ---
@@ -16,7 +16,6 @@ void MoveMent();
 void autonomus();
 void tagline(int Power);
 
-// --- Create Motor, PIDF, and Servo Objects ---
 // Initialize Left and Right motors with PWM settings from config.h
 Controller motorL(Controller::PRIK_NO_ENA, PWM_FREQUENCY, PWM_BITS, AINV, true, PWMA, AIN1, AIN2);
 Controller motorR(Controller::PRIK_NO_ENA, PWM_FREQUENCY, PWM_BITS, BINV, true, PWMB, BIN1, BIN2);
@@ -51,7 +50,11 @@ void setup() {
     // Enable Standby Pin for the Motor Driver
     pinMode(STBY, OUTPUT);
     digitalWrite(STBY, HIGH);
-    
+
+    // Setup and enable the IR LED control pin for the sensors
+    pinMode(IR_PIN, OUTPUT);
+    digitalWrite(IR_PIN, HIGH); 
+   
     // Setup QRE1113 line sensor pins as inputs
     pinMode(SENSOR_1, INPUT);
     pinMode(SENSOR_2, INPUT);
@@ -60,9 +63,6 @@ void setup() {
     pinMode(SENSOR_5, INPUT);
     pinMode(SENSOR_6, INPUT);
     
-    // Setup and enable the IR LED control pin for the sensors
-    pinMode(IR_PIN, OUTPUT);
-    digitalWrite(IR_PIN, HIGH); 
 
     // --- Allocate Hardware Timers for ESP32Servo ---
     // This prevents PWM signal conflicts between the motors and servos
@@ -87,7 +87,6 @@ void setup() {
     
     // Initialize Dabble Bluetooth communication
     Dabble.begin("MyRobot_PPAP"); 
-    Serial.println("Bluetooth Started! Waiting for Dabble app...");
 }
 
 void loop() {
@@ -137,7 +136,7 @@ void loop() {
         else if(GamePad.isCirclePressed()){
             intakeServo.write(180);
         }
-
+        
         // Manual Drop Servo Control (Toggle button)
         bool currentTriangleState = GamePad.isTrianglePressed();
         if (currentTriangleState == true && lastTriangleState == false) {
@@ -149,7 +148,7 @@ void loop() {
             } else {
                 // Close drop gates
                 dropservo.write(0);
-                dropservo2.write(0);
+                dropservo2.write(180);
             }
         }
         lastTriangleState = currentTriangleState;
@@ -233,10 +232,9 @@ void autonomus() {
 void steering(int x, int omega) {
     // Calculate individual PWM values for left and right motors
     int pwmLeft = x + omega;
-    int pwmRight = x - omega;
+    int pwmRight = (x - omega) * 0.95;
 
     int max_power = 1023; // Maximum allowed PWM value
-
     // Constrain the calculated PWM values to prevent hardware overload
     pwmLeft = constrain(pwmLeft, -max_power, max_power);
     pwmRight = constrain(pwmRight, -max_power, max_power);
