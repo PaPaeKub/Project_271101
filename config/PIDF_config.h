@@ -9,8 +9,4 @@
 #define Tagline_I_Min -Tagline_I_Max
 #define Tagline_ERROR_TOLERANCE 0
 
-
-
-
-
 #endif
