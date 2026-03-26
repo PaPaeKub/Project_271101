@@ -29,12 +29,11 @@
 #define DROP2_PIN 5 
 
 // --- Sensor Pins (QRE1113 x 6) ---
-#define SENSOR_1  36      
-#define SENSOR_2  39      
-#define SENSOR_3  34      
-#define SENSOR_4  35      
-#define SENSOR_5  32      
-#define SENSOR_6  33      
+#define SENSOR_1  34      
+#define SENSOR_3  35      
+#define SENSOR_6  32      
+#define SENSOR_8  33      
+    
 
 // --- Sensor IR Control Pin ---
 #define IR_PIN    4       

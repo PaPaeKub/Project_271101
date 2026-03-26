@@ -29,6 +29,8 @@ Servo intakeServo, dropservo, dropservo2;
 int speed = 0; 
 int r = 0;
 int intakeState = 90; 
+int Right_Errors, Left_Errors = 0;
+float error, Steer = 0.0;
 
 // Toggle states for Gamepad buttons
 bool isDropped = false;         
@@ -37,7 +39,7 @@ bool isAutoMode = false;
 bool lastStartState = false;  
 
 // Sensor reading variables
-int S1, S2, S3, S4, S5, S6 = 0;
+int S1, S3, S6, S8 = 0;
 
 // Autonomous mode state machine variables
 unsigned long autoStartTime = 0; 
@@ -57,15 +59,12 @@ void setup() {
    
     // Setup QRE1113 line sensor pins as inputs
     pinMode(SENSOR_1, INPUT);
-    pinMode(SENSOR_2, INPUT);
     pinMode(SENSOR_3, INPUT);
-    pinMode(SENSOR_4, INPUT);
-    pinMode(SENSOR_5, INPUT);
     pinMode(SENSOR_6, INPUT);
+    pinMode(SENSOR_8, INPUT);
     
 
     // --- Allocate Hardware Timers for ESP32Servo ---
-    // This prevents PWM signal conflicts between the motors and servos
     ESP32PWM::allocateTimer(0);
     ESP32PWM::allocateTimer(1);
     ESP32PWM::allocateTimer(2);
@@ -80,18 +79,36 @@ void setup() {
     intakeServo.write(90);
     
     dropservo.attach(DROP_PIN, 500, 2500); 
-    dropservo.write(0);
+    dropservo.write(90);
 
     dropservo2.attach(DROP2_PIN, 500, 2500); 
-    dropservo2.write(0); 
+    dropservo2.write(90); 
     
     // Initialize Dabble Bluetooth communication
     Dabble.begin("MyRobot_PPAP"); 
 }
 
+
 void loop() {
-    // Process incoming data from Dabble app
     Dabble.processInput(); 
+
+     // ตัวแปรเก็บเวลาสำหรับการโชว์ค่า (Static เพื่อให้จำค่าได้)
+//  static unsigned long lastPrintTime = 0;
+    
+//     if (GamePad.isCrossPressed()) {
+//         tagline(1023); // ให้หุ่นวิ่งแทร็กเส้นปกติ
+
+//         // โชว์ค่าแบบหน่วงเวลา (ทุก 200ms) ค่าที่โชว์จะเป็น 0-100 แล้ว
+//         if (millis() - lastPrintTime >= 200) { 
+//             Serial.print("S1:"); Serial.print(S1);
+//             Serial.print(" S3:"); Serial.print(S3);
+//             Serial.print(" S6:"); Serial.print(S6);
+//             Serial.print(" S8:"); Serial.print(S8);
+//             Serial.print(" | Err:"); Serial.println(error);
+//             lastPrintTime = millis(); 
+//         }
+//         return; // สำคัญมาก! ถ้ากด X อยู่ ให้ข้ามโค้ดด้านล่างทั้งหมดไปเลย
+//     }
 
     // ==========================================
     // 1. Start Button Toggle Logic (Auto/Manual)
@@ -143,17 +160,19 @@ void loop() {
             isDropped = !isDropped; 
             if (isDropped) {
                 // Open drop gates
-                dropservo.write(90);
-                dropservo2.write(90);
+                dropservo.write(30);
+                dropservo2.write(150);
             } else {
                 // Close drop gates
-                dropservo.write(0);
-                dropservo2.write(180);
+                dropservo.write(90);
+                dropservo2.write(90);
             }
         }
         lastTriangleState = currentTriangleState;
     }
 }
+
+//----------------------------------------------------------------------------------------------------------------------
 
 // --- Manual Movement Function ---
 void MoveMent() {
@@ -169,62 +188,97 @@ void MoveMent() {
 
 // --- Autonomous Line Tracking Sequence ---
 void autonomus() {
-    int Power = 1000;      // Base speed for line tracking
-    int threshold = 2000;  // Analog threshold to detect black line (0-4095)
+    int Power = 1023;      // ความเร็วสูงสุด 1000
 
-    // Initialize the timer on the first execution of the state machine
+    // เริ่มจับเวลาครั้งแรกเมื่อเข้าโหมด Auto
     if (autoStartTime == 0 && autoState == 0) {
         autoStartTime = millis(); 
-        Serial.println("--- Auto State 0: Tracking for 10 seconds ---");
+        Serial.println("--- State 0: วิ่งตามเส้น 7 วินาที ---");
     }
 
-    // State 2: Program finished. Stop motors and exit function.
-    if (autoState == 2) {
+    // [State 4] จบโปรแกรม
+    if (autoState == 4) {
         steering(0, 0);
         return; 
     }
 
-    // --- 1. Read Line Sensors ---
-    S1 = analogRead(SENSOR_1);
-    S2 = analogRead(SENSOR_2);
-    S3 = analogRead(SENSOR_3);
-    S4 = analogRead(SENSOR_4);
-    S5 = analogRead(SENSOR_5);
-    S6 = analogRead(SENSOR_6);
-
-    // --- 2. State Machine Logic ---
+    // ==========================================
+    // State Machine Logic (ลำดับการทำงาน)
+    // ==========================================
+    
     if (autoState == 0) {
-        // [State 0] Track the line continuously until 10 seconds (10,000 ms) pass
-        if (millis() - autoStartTime >= 10000) {
-            intakeServo.write(0); // Retract intake servo
-            autoState = 1;        // Move to the next state
-            Serial.println("--- 10 Seconds Reached! Servo Retracted. Moving to State 1 ---");
+        // [State 0] วิ่งตามเส้น 7 วินาที
+        tagline(Power); 
+        
+        if (millis() - autoStartTime >= 6000) {
+            autoStartTime = millis(); // รีเซ็ตนาฬิกาจับเวลา
+            autoState = 1;            // ขยับไปทำท่าต่อไป
+            Serial.println("--- State 1: เลี้ยวซ้ายล้อเดียว 1 วินาที ---");
         }
     } 
     else if (autoState == 1) {
-        // [State 1] Track the line until ALL sensors detect the black crossline
-        if (S1 > threshold && S2 > threshold && S3 > threshold && 
-            S4 > threshold && S5 > threshold && S6 > threshold) {
-            
-            steering(0, 0);         // Hard brake
-            intakeServo.write(90);  // Deploy intake servo
-            autoState = 2;          // Move to final stop state
-            
-            Serial.println("--- Crossline Detected! Servo Deployed. Auto Sequence Finished ---");
-            return; // Exit immediately to prevent further PID calculation
+        // [State 1] เลี้ยวซ้ายล้อเดียว (ล้อซ้ายหยุด ล้อขวาเดินหน้า) 1 วินาที
+        motorL.spin(0);
+        motorR.spin(Power);
+       
+        if (millis() - autoStartTime >= 1100) {
+            intakeServo.write(0);     // หุบเซอร์โว
+            autoStartTime = millis(); // รีเซ็ตนาฬิกาจับเวลา
+            autoState = 2;
+            Serial.println("--- State 2: หุบเซอร์โวแล้ว เลี้ยวซ้ายล้อเดียวต่อ 1 วินาที ---");
         }
     }
+    else if (autoState == 2) {
+        // [State 2] เลี้ยวซ้ายล้อเดียวต่อไปอีก 1 วินาที
+        motorL.spin(0);
+        motorR.spin(Power);
 
-    // --- 3. PID Line Tracking Calculation (Active during State 0 and 1) ---
-    // Calculate the weighted average for left and right sensor arrays
-    int Left_error  = ((S1*3) + (S2*2) + (S3*1));
-    int Right_error = ((S6*3) + (S5*2) + (S4*1));
+        if (millis() - autoStartTime >= 1100) {
+            autoStartTime = millis(); // รีเซ็ตนาฬิกาจับเวลา
+            autoState = 3;
+            Serial.println("--- State 3: วิ่งตามเส้นต่อ 7 วินาที ---");
+        }
+    }
+    else if (autoState == 3) {
+        // [State 3] วิ่งตามเส้นต่อ 7 วินาที
+        tagline(Power);
 
-    // Calculate the difference and compute the PID steering correction
-    float error = Right_error - Left_error;
-    float Steer = Tagline.compute_with_error(error);
+        if (millis() - autoStartTime >= 6000) {
+            autoState = 4; // ไปยังสถานะหยุดการทำงาน
+            Serial.println("--- จบการทำงาน Auto ---");
+        }
+    }
+}
+
+void tagline(int Power) {
+    // 1. กำหนดค่าดิบต่ำสุดของสีขาว และสูงสุดของสีดำ (ปรับให้เข้ากับเซนเซอร์ของคุณ)
+    int minWhite = 2200; 
+    int maxBlack = 4095;
+
+    // 2. อ่านค่าดิบ -> แปลงเป็นสเกล 0-100 -> ล็อคไม่ให้เกิน 0-100
+    S1 = constrain(map(analogRead(SENSOR_1), minWhite, maxBlack, 0, 100), 0, 100);
+    S3 = constrain(map(analogRead(SENSOR_3), minWhite, maxBlack, 0, 100), 0, 100);
+    S6 = constrain(map(analogRead(SENSOR_6), minWhite, maxBlack, 0, 100), 0, 100);
+    S8 = constrain(map(analogRead(SENSOR_8), minWhite, maxBlack, 0, 100), 0, 100);
+
+    // 3. กำหนด Threshold สำหรับพื้นขาว (บนสเกล 0-100)
+    // ถ้าค่าของเซนเซอร์ต่ำกว่า 40 ถือว่าเจอสีขาว
+    int whiteThreshold = 40; 
+
+    // 4. เช็คเส้นปะ (ถ้าเจอสีขาวหมดทุกตัว)
+    if (S1 < whiteThreshold && S3 < whiteThreshold && S6 < whiteThreshold && S8 < whiteThreshold) {
+        // สั่งเดินหน้าตรงๆ โดยไม่คำนวณ PID
+        steering(Power, 0); 
+        return; 
+    }
+
+    // 5. คำนวณ PID บนสเกลใหม่ (0-100)
+    Left_Errors  = ((S1*3) + (S3*1));
+    Right_Errors = ((S8*3) + (S6*1));
+
+    error = Left_Errors - Right_Errors;
+    Steer = Tagline.compute_with_error(error);
     
-    // Apply speed and steering correction to the motors
     steering(Power, Steer);
 }
 
@@ -232,7 +286,7 @@ void autonomus() {
 void steering(int x, int omega) {
     // Calculate individual PWM values for left and right motors
     int pwmLeft = x + omega;
-    int pwmRight = (x - omega) * 0.95;
+    int pwmRight = (x - omega) * 0.85;
 
     int max_power = 1023; // Maximum allowed PWM value
     // Constrain the calculated PWM values to prevent hardware overload
